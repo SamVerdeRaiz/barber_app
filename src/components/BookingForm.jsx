@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
+console.log("Insertando en tabla citas...");
+
 const horariosBase = [
   "10:00","11:00","12:00","13:00","14:00",
   "15:00","16:00","17:00","18:00",
@@ -120,7 +122,7 @@ export default function BookingForm() {
     setLoading(false);
   };
 
-  // 🔥 REALTIME AQUÍ (LO NUEVO 🔥🔥🔥)
+  // 🔥 REALTIME CORREGIDO (PRO 🔥)
   useEffect(() => {
     const channel = supabase
       .channel("booking-realtime")
@@ -131,10 +133,13 @@ export default function BookingForm() {
           schema: "public",
           table: "citas",
         },
-        () => {
-          console.log("Actualizando horarios en vivo...");
+        (payload) => {
+          console.log("Cambio detectado:", payload);
 
-          actualizarHorarios(form.fecha, form.barbero);
+          // 🔥 evita stale state
+          setTimeout(() => {
+            actualizarHorarios(form.fecha, form.barbero);
+          }, 0);
         }
       )
       .subscribe();
@@ -142,7 +147,7 @@ export default function BookingForm() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [form.fecha, form.barbero]);
+  }, []); // 🔥 SOLO UNA VEZ
 
   return (
     <section className="py-16 px-4 bg-gray-100">
