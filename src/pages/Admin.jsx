@@ -29,9 +29,11 @@ export default function Admin() {
       .update({ estado: "confirmado" })
       .eq("id", cita.id);
 
+    // 📲 Mensaje WhatsApp
     const mensaje = `Hola ${cita.nombre}, tu cita para ${cita.servicio} con ${cita.barbero} ha sido CONFIRMADA 💈 el día ${cita.fecha} a las ${cita.hora}.`;
 
-    const telefono = cita.telefono.replace(/\D/g, "");
+    const telefono = cita.telefono.replace(/\D/g, ""); // limpia espacios
+
     const url = `https://wa.me/52${telefono}?text=${encodeURIComponent(mensaje)}`;
 
     window.open(url, "_blank");
@@ -39,11 +41,12 @@ export default function Admin() {
     fetchCitas();
   };
 
-  // 🔥 WhatsApp manual
+  // 🔥 Botón solo para enviar WhatsApp manual
   const enviarWhatsApp = (cita) => {
     const mensaje = `Hola ${cita.nombre}, te recordamos tu cita para ${cita.servicio} con ${cita.barbero} 💈 el día ${cita.fecha} a las ${cita.hora}.`;
 
     const telefono = cita.telefono.replace(/\D/g, "");
+
     const url = `https://wa.me/52${telefono}?text=${encodeURIComponent(mensaje)}`;
 
     window.open(url, "_blank");
@@ -56,39 +59,6 @@ export default function Admin() {
 
   useEffect(() => {
     fetchCitas();
-
-    // 🔥 REALTIME SUPABASE
-    const channel = supabase
-      .channel("citas-realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // INSERT, UPDATE, DELETE
-          schema: "public",
-          table: "citas",
-        },
-        (payload) => {
-          console.log("Cambio en citas:", payload);
-
-          // 🔥 refrescar lista automática
-          fetchCitas();
-
-          // 🔔 alerta solo cuando hay nueva cita
-          if (payload.eventType === "INSERT") {
-            const nueva = payload.new;
-
-            alert(
-              `Nueva cita 💈\n${nueva.nombre} - ${nueva.servicio} con ${nueva.barbero}`
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    // 🧹 limpiar suscripción
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   return (
@@ -120,6 +90,7 @@ export default function Admin() {
 
             <p className="text-gray-300">{cita.servicio}</p>
 
+            {/* 🔥 BARBERO */}
             <p className="text-yellow-400 font-semibold">
               💈 {cita.barbero || "Sin asignar"}
             </p>
@@ -128,17 +99,15 @@ export default function Admin() {
               {cita.fecha} - {cita.hora}
             </p>
 
-            <p
-              className={`mt-2 font-bold ${
-                cita.estado === "confirmado"
-                  ? "text-green-400"
-                  : "text-yellow-400"
-              }`}
-            >
+            {/* 🔥 ESTADO */}
+            <p className={`mt-2 font-bold ${
+              cita.estado === "confirmado" ? "text-green-400" : "text-yellow-400"
+            }`}>
               {cita.estado}
             </p>
 
             <div className="flex flex-wrap gap-2 mt-4">
+              {/* Confirmar */}
               <button
                 onClick={() => confirmarCita(cita)}
                 className="bg-green-500 px-3 py-2 rounded"
@@ -146,6 +115,7 @@ export default function Admin() {
                 Confirmar
               </button>
 
+              {/* WhatsApp */}
               <button
                 onClick={() => enviarWhatsApp(cita)}
                 className="bg-green-700 px-3 py-2 rounded"
@@ -153,6 +123,7 @@ export default function Admin() {
                 WhatsApp
               </button>
 
+              {/* Eliminar */}
               <button
                 onClick={() => eliminarCita(cita.id)}
                 className="bg-red-500 px-3 py-2 rounded"
