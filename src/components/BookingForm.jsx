@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
-console.log("Insertando en tabla citas...");
-
 const horariosBase = [
   "10:00","11:00","12:00","13:00","14:00",
   "15:00","16:00","17:00","18:00",
 ];
+
+// 💰 PRECIOS
+const precios = {
+  "Corte": 100,
+  "Corte + barba": 150,
+  "Barba": 80,
+};
 
 export default function BookingForm() {
   const [form, setForm] = useState({
@@ -20,10 +25,38 @@ export default function BookingForm() {
 
   const [horarios, setHorarios] = useState(horariosBase);
   const [loading, setLoading] = useState(false);
+  const [bloqueado, setBloqueado] = useState(false);
 
-  // 🔥 FUNCIÓN CENTRAL PARA ACTUALIZAR HORARIOS
+  const [barberos, setBarberos] = useState([]);
+
+  useEffect(() => {
+    const fetchBarberos = async () => {
+      const { data } = await supabase
+        .from("barberos")
+        .select("*")
+        .eq("activo", true);
+
+      setBarberos(data || []);
+    };
+
+    fetchBarberos();
+  }, []);
+
   const actualizarHorarios = async (fecha, barbero) => {
     if (!fecha || !barbero) return;
+
+    const { data: bloqueo } = await supabase
+      .from("bloqueos")
+      .select("*")
+      .eq("fecha", fecha);
+
+    if (bloqueo.length > 0) {
+      setBloqueado(true);
+      setHorarios([]);
+      return;
+    } else {
+      setBloqueado(false);
+    }
 
     const { data, error } = await supabase
       .from("citas")
@@ -45,7 +78,6 @@ export default function BookingForm() {
     setHorarios(disponibles);
   };
 
-  // 🔹 Manejo general
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -53,7 +85,6 @@ export default function BookingForm() {
     });
   };
 
-  // 🔥 Fecha
   const handleFechaChange = async (e) => {
     const fecha = e.target.value;
 
@@ -66,7 +97,6 @@ export default function BookingForm() {
     actualizarHorarios(fecha, form.barbero);
   };
 
-  // 🔥 Barbero
   const handleBarberoChange = async (e) => {
     const barbero = e.target.value;
 
@@ -79,10 +109,15 @@ export default function BookingForm() {
     actualizarHorarios(form.fecha, barbero);
   };
 
-  // 🚀 Guardar cita
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    if (bloqueado) {
+      alert("Este día no hay servicio ❌");
+      setLoading(false);
+      return;
+    }
 
     const { data: existing } = await supabase
       .from("citas")
@@ -99,7 +134,13 @@ export default function BookingForm() {
 
     const { error } = await supabase
       .from("citas")
-      .insert([{ ...form, estado: "pendiente" }]);
+      .insert([
+        {
+          ...form,
+          estado: "pendiente",
+          precio: precios[form.servicio] || 0, // 💰 AQUÍ SE AGREGA
+        },
+      ]);
 
     if (error) {
       alert("Error al guardar cita");
@@ -121,8 +162,25 @@ export default function BookingForm() {
 
     setLoading(false);
   };
+  const marcarRealizado = async (cita) => {
+  // 🔥 tabla de precios
+  const precios = {
+    "Corte": 100,
+    "Corte + barba": 150,
+    "Barba": 80
+  };
 
-  // 🔥 REALTIME CORREGIDO (PRO 🔥)
+  const precio = precios[cita.servicio] || 0;
+
+await supabase
+  .from("citas")
+  .update({ 
+    estado: "realizado",
+    precio: Number(precio) // 👈 fuerza número
+  })
+  .eq("id", cita.id);
+};
+
   useEffect(() => {
     const channel = supabase
       .channel("booking-realtime")
@@ -133,10 +191,7 @@ export default function BookingForm() {
           schema: "public",
           table: "citas",
         },
-        (payload) => {
-          console.log("Cambio detectado:", payload);
-
-          // 🔥 evita stale state
+        () => {
           setTimeout(() => {
             actualizarHorarios(form.fecha, form.barbero);
           }, 0);
@@ -147,11 +202,11 @@ export default function BookingForm() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []); // 🔥 SOLO UNA VEZ
+  }, []);
 
   return (
-    <section className="py-16 px-4 bg-gray-100">
-      <h2 className="text-3xl font-bold text-center mb-6">
+    <section id="BookingForm" className="py-16 px-4 bg-gray-100">
+      <h2 className="text-3xl font-serif text-center mb-6">
         Agenda tu cita
       </h2>
 
@@ -159,31 +214,12 @@ export default function BookingForm() {
         onSubmit={handleSubmit}
         className="max-w-md mx-auto space-y-4 bg-white p-6 rounded-xl shadow"
       >
-        <input
-          name="nombre"
-          placeholder="Nombre"
-          value={form.nombre}
-          onChange={handleChange}
-          required
-          className="w-full p-3 border rounded"
-        />
 
-        <input
-          name="telefono"
-          placeholder="Teléfono"
-          value={form.telefono}
-          onChange={handleChange}
-          required
-          className="w-full p-3 border rounded"
-        />
+        <input name="nombre" placeholder="Nombre" value={form.nombre} onChange={handleChange} required className="w-full p-3 border rounded"/>
 
-        <select
-          name="servicio"
-          value={form.servicio}
-          onChange={handleChange}
-          required
-          className="w-full p-3 border rounded"
-        >
+        <input name="telefono" placeholder="Teléfono" value={form.telefono} onChange={handleChange} required className="w-full p-3 border rounded"/>
+
+        <select name="servicio" value={form.servicio} onChange={handleChange} required className="w-full p-3 border rounded">
           <option value="">Selecciona servicio</option>
           <option>Corte</option>
           <option>Corte + barba</option>
@@ -198,42 +234,37 @@ export default function BookingForm() {
           className="w-full p-3 border rounded"
         >
           <option value="">Selecciona barbero</option>
-          <option>Juan</option>
-          <option>Pedro</option>
+
+          {barberos.map((b) => (
+            <option key={b.id} value={b.nombre}>
+              {b.nombre}
+            </option>
+          ))}
         </select>
 
-        <input
-          type="date"
-          name="fecha"
-          value={form.fecha}
-          onChange={handleFechaChange}
-          required
-          className="w-full p-3 border rounded"
-        />
+        <input type="date" name="fecha" value={form.fecha} onChange={handleFechaChange} required className="w-full p-3 border rounded"/>
 
-        <select
-          name="hora"
-          value={form.hora}
-          onChange={handleChange}
-          required
-          className="w-full p-3 border rounded"
-        >
+        {bloqueado && (
+          <p className="text-red-500 text-center">
+            🚫 No hay servicio este día
+          </p>
+        )}
+
+        <select name="hora" value={form.hora} onChange={handleChange} required disabled={bloqueado} className="w-full p-3 border rounded">
           <option value="">Selecciona horario</option>
 
           {horarios.length === 0 ? (
-            <option disabled>No hay horarios disponibles</option>
+            <option disabled>No disponible</option>
           ) : (
             horarios.map((hora) => (
-              <option key={hora} value={hora}>
-                {hora}
-              </option>
+              <option key={hora} value={hora}>{hora}</option>
             ))
           )}
         </select>
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || bloqueado}
           className="w-full bg-black text-white py-3 rounded hover:bg-gray-800 transition"
         >
           {loading ? "Guardando..." : "Agendar cita"}

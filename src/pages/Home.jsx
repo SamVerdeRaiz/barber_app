@@ -9,6 +9,7 @@ import CTA from "../components/CTA";
 import Location from "../components/Location";
 import WhatsAppFloat from "../components/WhatsAppFloat";
 import BookingForm from "../components/BookingForm";
+import Navbar from "../components/Navbar";
 
 export default function Home() {
   return (
@@ -22,14 +23,16 @@ export default function Home() {
           Admin
         </Link>
       </div>
-
+      <Navbar />
       <Hero />
+      <BookingForm />
       <Benefits />
       <Services />
-      <HowItWork />
+      
       <Testimonials />
       <CTA />
-      <BookingForm />
+      
+      
       <Location />
       <WhatsAppFloat />
     </>

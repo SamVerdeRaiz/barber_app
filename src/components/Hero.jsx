@@ -1,29 +1,63 @@
+import { useEffect, useState } from "react";
+
 export default function Hero() {
+  const [opacity, setOpacity] = useState(1);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      const fade = Math.max(1 - scrollY / 400, 0);
+      setOpacity(fade);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <section className="bg-black text-white text-center py-20 px-4">
-      <img
-        src="/hero.jpg"
-        alt="Barbería"
-        className="mx-auto w-full max-w-md rounded-2xl shadow-lg"
-      />
+    <section id="Hero" className="relative h-screen overflow-hidden">
 
-      <h1 className="text-4xl md:text-6xl font-bold mt-8">
-        Cortes premium sin esperar
-      </h1>
+      {/* 🔥 FONDO */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-fixed"
+        style={{ backgroundImage: "url('/hero.jpg')" }}
+      ></div>
 
-      <p className="mt-4 text-lg text-gray-300">
-        Reserva tu cita en segundos y luce impecable
-      </p>
+      {/* 🔥 OVERLAY */}
+      <div className="absolute inset-0 bg-black/60"></div>
 
-      <button
-        onClick={() =>
-          window.open("https://wa.me/521XXXXXXXXXX", "_blank")
-        }
-        className="mt-6 bg-green-500 hover:bg-green-600 px-8 py-3 rounded-xl font-semibold transition"
+      {/* 🔥 CONTENIDO */}
+      <div
+        style={{ opacity }}
+        className="relative z-10 h-full flex flex-col justify-center items-center text-center text-white px-4 transition-opacity duration-200"
       >
-        Agendar por WhatsApp
-      </button>
-      
+        <h1 className="text-4xl md:text-6xl font-serif">
+          Shining Salon and barber 
+        </h1>
+
+        <p className="mt-4 text-lg text-gray-300 max-w-xl font-sans">
+          Reserva tu cita en segundos y luce impecable
+        </p>
+              <a
+  href="#BookingForm"
+  className="mt-6 bg-white text-black px-8 py-3 rounded-xl font-semibold"
+>
+  Agendar ahora
+</a>
+      </div>
+
+      {/* 🔥 FLECHA FIJA ABAJO */}
+      <div className="absolute bottom-10 w-full flex justify-center z-10">
+        <a
+          href="#Services"
+          className="text-white text-center hover:opacity-70 transition"
+        >
+          <p className="text-sm">Ver servicios</p>
+          <div className="text-2xl">↓</div>
+        </a>
+    
+      </div>
+
     </section>
   );
 }

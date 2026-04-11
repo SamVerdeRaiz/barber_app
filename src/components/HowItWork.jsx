@@ -1,6 +1,6 @@
 export default function HowItWork() {
   return (
-    <section>
+    <section id="HowItWorks">
       <h2>¿Cómo funciona?</h2>
 
       <div>
