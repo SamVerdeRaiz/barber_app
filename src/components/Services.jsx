@@ -1,7 +1,7 @@
 export default function Services() {
   return (
     <section
-      id="services"
+      id="Services"
       className="h-screen bg-black text-white relative flex flex-col justify-center px-6 md:px-20"
     >
 

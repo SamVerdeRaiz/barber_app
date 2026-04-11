@@ -27,20 +27,32 @@ export default function BookingForm() {
   const [loading, setLoading] = useState(false);
   const [bloqueado, setBloqueado] = useState(false);
 
-  const [barberos, setBarberos] = useState([]);
+  // 🔥 NUEVO STATE
+  const [barberosDisponibles, setBarberosDisponibles] = useState([]);
 
-  useEffect(() => {
-    const fetchBarberos = async () => {
-      const { data } = await supabase
-        .from("barberos")
-        .select("*")
-        .eq("activo", true);
+  // 🔥 NUEVA FUNCIÓN
+  const actualizarBarberosDisponibles = async (fecha, hora) => {
+    if (!fecha || !hora) return;
 
-      setBarberos(data || []);
-    };
+    const { data, error } = await supabase
+      .from("citas")
+      .select("barbero")
+      .eq("fecha", fecha)
+      .eq("hora", hora);
 
-    fetchBarberos();
-  }, []);
+    if (error) {
+      console.log(error);
+      return;
+    }
+
+    const ocupados = data.map(c => c.barbero);
+
+    const todos = ["Juan", "José", "Laura", "Rocío"];
+
+    const disponibles = todos.filter(b => !ocupados.includes(b));
+
+    setBarberosDisponibles(disponibles);
+  };
 
   const actualizarHorarios = async (fecha, barbero) => {
     if (!fecha || !barbero) return;
@@ -78,11 +90,19 @@ export default function BookingForm() {
     setHorarios(disponibles);
   };
 
+  // 🔥 HANDLE CHANGE MODIFICADO
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
     setForm({
       ...form,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+
+    // 🔥 si cambia la hora → actualizar barberos
+    if (name === "hora") {
+      actualizarBarberosDisponibles(form.fecha, value);
+    }
   };
 
   const handleFechaChange = async (e) => {
@@ -92,9 +112,13 @@ export default function BookingForm() {
       ...form,
       fecha,
       hora: "",
+      barbero: "",
     });
 
     actualizarHorarios(fecha, form.barbero);
+
+    // 🔥 NUEVO
+    actualizarBarberosDisponibles(fecha, form.hora);
   };
 
   const handleBarberoChange = async (e) => {
@@ -119,15 +143,21 @@ export default function BookingForm() {
       return;
     }
 
-    const { data: existing } = await supabase
+    const { data: existing, error: errorCheck } = await supabase
       .from("citas")
-      .select("*")
+      .select("id")
       .eq("fecha", form.fecha)
       .eq("hora", form.hora)
       .eq("barbero", form.barbero);
 
-    if (existing.length > 0) {
-      alert("Ese horario ya está ocupado ❌");
+    if (errorCheck) {
+      console.log(errorCheck);
+      setLoading(false);
+      return;
+    }
+
+    if (existing && existing.length > 0) {
+      alert("Ese horario ya está ocupado con ese barbero ❌");
       setLoading(false);
       return;
     }
@@ -138,7 +168,7 @@ export default function BookingForm() {
         {
           ...form,
           estado: "pendiente",
-          precio: precios[form.servicio] || 0, // 💰 AQUÍ SE AGREGA
+          precio: precios[form.servicio] || 0,
         },
       ]);
 
@@ -158,28 +188,11 @@ export default function BookingForm() {
       });
 
       setHorarios(horariosBase);
+      setBarberosDisponibles([]);
     }
 
     setLoading(false);
   };
-  const marcarRealizado = async (cita) => {
-  // 🔥 tabla de precios
-  const precios = {
-    "Corte": 100,
-    "Corte + barba": 150,
-    "Barba": 80
-  };
-
-  const precio = precios[cita.servicio] || 0;
-
-await supabase
-  .from("citas")
-  .update({ 
-    estado: "realizado",
-    precio: Number(precio) // 👈 fuerza número
-  })
-  .eq("id", cita.id);
-};
 
   useEffect(() => {
     const channel = supabase
@@ -194,6 +207,7 @@ await supabase
         () => {
           setTimeout(() => {
             actualizarHorarios(form.fecha, form.barbero);
+            actualizarBarberosDisponibles(form.fecha, form.hora);
           }, 0);
         }
       )
@@ -226,6 +240,7 @@ await supabase
           <option>Barba</option>
         </select>
 
+        {/* 🔥 NUEVO SELECT DINÁMICO */}
         <select
           name="barbero"
           value={form.barbero}
@@ -235,11 +250,15 @@ await supabase
         >
           <option value="">Selecciona barbero</option>
 
-          {barberos.map((b) => (
-            <option key={b.id} value={b.nombre}>
-              {b.nombre}
-            </option>
-          ))}
+          {barberosDisponibles.length === 0 ? (
+            <option disabled>No disponibles</option>
+          ) : (
+            barberosDisponibles.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))
+          )}
         </select>
 
         <input type="date" name="fecha" value={form.fecha} onChange={handleFechaChange} required className="w-full p-3 border rounded"/>
