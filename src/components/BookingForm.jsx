@@ -30,7 +30,7 @@ export default function BookingForm() {
   // 🔥 NUEVO STATE
   const [barberosDisponibles, setBarberosDisponibles] = useState([]);
 
-  // 🔥 NUEVA FUNCIÓN
+  // 🔥 NUEVA FUNCIÓN (sin cambios)
   const actualizarBarberosDisponibles = async (fecha, hora) => {
     if (!fecha || !hora) return;
 
@@ -55,7 +55,7 @@ export default function BookingForm() {
   };
 
   const actualizarHorarios = async (fecha, barbero) => {
-    if (!fecha || !barbero) return;
+    if (!fecha) return;
 
     const { data: bloqueo } = await supabase
       .from("bloqueos")
@@ -68,6 +68,12 @@ export default function BookingForm() {
       return;
     } else {
       setBloqueado(false);
+    }
+
+    // 🔥 CAMBIO: si no hay barbero aún → mostrar todos los horarios
+    if (!barbero) {
+      setHorarios(horariosBase);
+      return;
     }
 
     const { data, error } = await supabase
@@ -90,7 +96,7 @@ export default function BookingForm() {
     setHorarios(disponibles);
   };
 
-  // 🔥 HANDLE CHANGE MODIFICADO
+  // 🔥 HANDLE CHANGE
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -99,12 +105,13 @@ export default function BookingForm() {
       [name]: value,
     });
 
-    // 🔥 si cambia la hora → actualizar barberos
+    // 🔥 cuando elige hora → cargar barberos
     if (name === "hora") {
       actualizarBarberosDisponibles(form.fecha, value);
     }
   };
 
+  // 🔥 FECHA PRIMERO
   const handleFechaChange = async (e) => {
     const fecha = e.target.value;
 
@@ -115,22 +122,19 @@ export default function BookingForm() {
       barbero: "",
     });
 
-    actualizarHorarios(fecha, form.barbero);
+    setBarberosDisponibles([]); // limpiar barberos
 
-    // 🔥 NUEVO
-    actualizarBarberosDisponibles(fecha, form.hora);
+    actualizarHorarios(fecha);
   };
 
+  // 🔥 BARBERO
   const handleBarberoChange = async (e) => {
     const barbero = e.target.value;
 
     setForm({
       ...form,
       barbero,
-      hora: "",
     });
-
-    actualizarHorarios(form.fecha, barbero);
   };
 
   const handleSubmit = async (e) => {
@@ -162,6 +166,7 @@ export default function BookingForm() {
       return;
     }
 
+    // 🔥 AGREGAMOS PRECIO (oculto pero guardado)
     const { error } = await supabase
       .from("citas")
       .insert([
@@ -240,27 +245,7 @@ export default function BookingForm() {
           <option>Barba</option>
         </select>
 
-        {/* 🔥 NUEVO SELECT DINÁMICO */}
-        <select
-          name="barbero"
-          value={form.barbero}
-          onChange={handleBarberoChange}
-          required
-          className="w-full p-3 border rounded"
-        >
-          <option value="">Selecciona barbero</option>
-
-          {barberosDisponibles.length === 0 ? (
-            <option disabled>No disponibles</option>
-          ) : (
-            barberosDisponibles.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))
-          )}
-        </select>
-
+        {/* 🔥 FECHA */}
         <input type="date" name="fecha" value={form.fecha} onChange={handleFechaChange} required className="w-full p-3 border rounded"/>
 
         {bloqueado && (
@@ -269,6 +254,7 @@ export default function BookingForm() {
           </p>
         )}
 
+        {/* 🔥 HORA */}
         <select name="hora" value={form.hora} onChange={handleChange} required disabled={bloqueado} className="w-full p-3 border rounded">
           <option value="">Selecciona horario</option>
 
@@ -280,6 +266,29 @@ export default function BookingForm() {
             ))
           )}
         </select>
+
+        {/* 🔥 BARBERO (AL FINAL Y DINÁMICO) */}
+        {form.hora && (
+          <select
+            name="barbero"
+            value={form.barbero}
+            onChange={handleBarberoChange}
+            required
+            className="w-full p-3 border rounded"
+          >
+            <option value="">Selecciona barbero</option>
+
+            {barberosDisponibles.length === 0 ? (
+              <option disabled>No disponibles</option>
+            ) : (
+              barberosDisponibles.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))
+            )}
+          </select>
+        )}
 
         <button
           type="submit"

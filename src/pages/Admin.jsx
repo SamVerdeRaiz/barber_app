@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 
@@ -7,6 +7,9 @@ export default function Admin() {
   const [filtroFecha, setFiltroFecha] = useState("todas");
   const [fechaCustom, setFechaCustom] = useState("");
   const [filtroBarbero, setFiltroBarbero] = useState("");
+  const [animarTotal, setAnimarTotal] = useState(false);
+
+  const prevTotalRef = useRef(0);
 
   const navigate = useNavigate();
 
@@ -19,7 +22,17 @@ export default function Admin() {
       .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
 
-    if (!error) setCitas(data);
+    if (!error) {
+      setCitas(data);
+
+      // 🔥 animación cuando llegan nuevas citas
+      if (data.length > prevTotalRef.current) {
+        setAnimarTotal(true);
+        setTimeout(() => setAnimarTotal(false), 500);
+      }
+
+      prevTotalRef.current = data.length;
+    }
   };
 
   // 🔥 REALTIME
@@ -55,25 +68,13 @@ export default function Admin() {
     window.open(`https://wa.me/52${telefono}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
 
-  // 🔥 NUEVO: MARCAR COMO REALIZADO
-const marcarRealizado = async (cita) => {
-  // 🔥 tabla de precios
-  const precios = {
-    "Corte": 100,
-    "Corte + barba": 150,
-    "Barba": 80
+  // 🔥 HECHO = DESAPARECE + SUMA INGRESO
+  const marcarRealizado = async (cita) => {
+    await supabase
+      .from("citas")
+      .update({ estado: "realizado" })
+      .eq("id", cita.id);
   };
-
-  const precio = precios[cita.servicio] || 0;
-
-  await supabase
-    .from("citas")
-    .update({ 
-      estado: "realizado",
-      precio: precio // 🔥 AQUÍ ESTÁ LA CLAVE
-    })
-    .eq("id", cita.id);
-};
 
   const enviarWhatsApp = (cita) => {
     const mensaje = `Hola ${cita.nombre}, te recordamos tu cita para ${cita.servicio} con ${cita.barbero} 💈 el día ${cita.fecha} a las ${cita.hora}.`;
@@ -102,10 +103,15 @@ const marcarRealizado = async (cita) => {
     citasFiltradas = citasFiltradas.filter(c => c.barbero === filtroBarbero);
   }
 
+  // 🔥 QUITAR REALIZADAS DE LA LISTA PRINCIPAL
+  citasFiltradas = citasFiltradas.filter(c => c.estado !== "realizado");
+
   // 🔥 MÉTRICAS
   const total = citasFiltradas.length;
+
   const confirmadas = citasFiltradas.filter(c => c.estado === "confirmado").length;
-  const pendientes = citasFiltradas.filter(c => c.estado !== "confirmado").length;
+
+  const pendientes = citasFiltradas.filter(c => c.estado === "pendiente").length;
 
   const citasHoy = citas.filter(c => c.fecha === hoy).length;
 
@@ -113,6 +119,55 @@ const marcarRealizado = async (cita) => {
   const ingresosHoy = citas
     .filter(c => c.fecha === hoy && c.estado === "realizado")
     .reduce((acc, c) => acc + (c.precio || 0), 0);
+
+
+// 🔥 INGRESOS POR SEMANA
+const hoyDate = new Date();
+const inicioSemana = new Date(hoyDate);
+inicioSemana.setDate(hoyDate.getDate() - hoyDate.getDay());
+
+const ingresosSemana = citas
+  .filter(c => {
+    const fecha = new Date(c.fecha);
+    return fecha >= inicioSemana && c.estado === "realizado";
+  })
+  .reduce((acc, c) => acc + (c.precio || 0), 0);
+
+// 🔥 RANKING BARBEROS
+const rankingBarberos = {};
+
+citas.forEach(c => {
+  if (c.estado === "realizado") {
+    if (!rankingBarberos[c.barbero]) {
+      rankingBarberos[c.barbero] = 0;
+    }
+    rankingBarberos[c.barbero] += c.precio || 0;
+  }
+});
+
+// ordenar ranking
+const rankingOrdenado = Object.entries(rankingBarberos)
+  .sort((a, b) => b[1] - a[1]);
+
+  // 🔥 CITAS POR BARBERO
+  const citasPorBarbero = {};
+
+  citas
+    .filter(c => c.fecha === hoy)
+    .forEach(c => {
+      if (!citasPorBarbero[c.barbero]) {
+        citasPorBarbero[c.barbero] = 0;
+      }
+      citasPorBarbero[c.barbero]++;
+    });
+
+  // 🔥 ORDENAR POR BARBERO Y HORA
+  citasFiltradas.sort((a, b) => {
+    if (a.barbero === b.barbero) {
+      return a.hora.localeCompare(b.hora);
+    }
+    return a.barbero.localeCompare(b.barbero);
+  });
 
   return (
     <div className="min-h-screen bg-black text-white px-6 md:px-20 py-10">
@@ -132,59 +187,40 @@ const marcarRealizado = async (cita) => {
         </button>
       </div>
 
-      {/* FILTROS */}
-      <div className="flex flex-wrap gap-4 mb-8">
+      {/* 🔥 CONTADOR ANIMADO */}
+      <div className={`text-6xl font-bold mb-6 transition ${animarTotal ? "scale-110 text-green-400" : ""}`}>
+        {total} citas activas
+      </div>
 
-        <select
-          onChange={(e) => setFiltroFecha(e.target.value)}
-          className="bg-gray-900 border border-white/10 p-2 rounded"
-        >
-          <option value="todas">Todas</option>
-          <option value="hoy">Hoy</option>
-          <option value="custom">Elegir fecha</option>
-        </select>
-
-        {filtroFecha === "custom" && (
-          <input
-            type="date"
-            onChange={(e) => setFechaCustom(e.target.value)}
-            className="bg-gray-900 border border-white/10 p-2 rounded"
-          />
-        )}
-
-        <input
-          placeholder="Filtrar por barbero"
-          onChange={(e) => setFiltroBarbero(e.target.value)}
-          className="bg-gray-900 border border-white/10 p-2 rounded"
-        />
-
+      {/* 🔥 CITAS POR BARBERO */}
+      <div className="flex gap-4 mb-10 flex-wrap">
+        {Object.entries(citasPorBarbero).map(([barbero, cantidad]) => (
+          <div key={barbero} className="bg-gray-900 px-4 py-2 rounded-xl">
+            💈 {barbero}: {cantidad}
+          </div>
+        ))}
       </div>
 
       {/* DASHBOARD */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
 
         <div className="bg-gray-900 p-4 rounded-xl">
-          <p className="text-gray-400">Total</p>
-          <h2 className="text-2xl">{total}</h2>
-        </div>
-
-        <div className="bg-gray-900 p-4 rounded-xl">
-          <p className="text-gray-400">Pendientes</p>
+          <p>Pendientes</p>
           <h2 className="text-2xl text-yellow-400">{pendientes}</h2>
         </div>
 
         <div className="bg-gray-900 p-4 rounded-xl">
-          <p className="text-gray-400">Confirmadas</p>
+          <p>Confirmadas</p>
           <h2 className="text-2xl text-green-400">{confirmadas}</h2>
         </div>
 
         <div className="bg-gray-900 p-4 rounded-xl">
-          <p className="text-gray-400">Hoy</p>
+          <p>Hoy</p>
           <h2 className="text-2xl text-blue-400">{citasHoy}</h2>
         </div>
 
         <div className="bg-gray-900 p-4 rounded-xl">
-          <p className="text-gray-400">Ingresos Hoy</p>
+          <p>Ingresos Hoy</p>
           <h2 className="text-2xl text-green-400">${ingresosHoy}</h2>
         </div>
 
@@ -210,8 +246,6 @@ const marcarRealizado = async (cita) => {
             <span className={`inline-block mt-2 text-xs px-2 py-1 rounded-full
               ${cita.estado === "confirmado"
                 ? "bg-green-500/20 text-green-400"
-                : cita.estado === "realizado"
-                ? "bg-blue-500/20 text-blue-400"
                 : "bg-yellow-500/20 text-yellow-400"}
             `}>
               {cita.estado}
