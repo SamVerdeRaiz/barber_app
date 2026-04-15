@@ -150,6 +150,17 @@ const rankingOrdenado = Object.entries(rankingBarberos)
   .sort((a, b) => b[1] - a[1]);
 
   // 🔥 CITAS POR BARBERO
+
+  <div className="bg-gray-900 p-5 rounded-xl">
+  <h2 className="text-xl mb-4">🏆 Ranking Barberos</h2>
+
+  {rankingOrdenado.map(([barbero, total]) => (
+    <p key={barbero} className="text-sm text-gray-300">
+      {barbero} - ${total}
+    </p>
+  ))}
+</div>
+
   const citasPorBarbero = {};
 
   citas
@@ -160,6 +171,15 @@ const rankingOrdenado = Object.entries(rankingBarberos)
       }
       citasPorBarbero[c.barbero]++;
     });
+    <div className="bg-gray-900 p-5 rounded-xl">
+  <h2 className="text-xl mb-4">🏆 Ranking Barberos</h2>
+
+  {rankingOrdenado.map(([barbero, total]) => (
+    <p key={barbero} className="text-sm text-gray-300">
+      {barbero} - ${total}
+    </p>
+  ))}
+</div>
 
   // 🔥 ORDENAR POR BARBERO Y HORA
   citasFiltradas.sort((a, b) => {
@@ -222,6 +242,11 @@ const rankingOrdenado = Object.entries(rankingBarberos)
         <div className="bg-gray-900 p-4 rounded-xl">
           <p>Ingresos Hoy</p>
           <h2 className="text-2xl text-green-400">${ingresosHoy}</h2>
+        </div>
+
+        <div className="bg-gray-900 p-4 rounded-xl">
+           <p className="text-gray-400">Ingresos Semana</p> 
+           <h2 className="text-2xl text-green-400">${ingresosSemana}</h2>
         </div>
 
       </div>
