@@ -1,22 +1,57 @@
-import { supabase } from "../lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+
+// 🔐 Cliente seguro para backend (usa variables de entorno en Vercel)
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
-  const mañana = new Date();
-  mañana.setDate(mañana.getDate() + 1);
-  const fecha = mañana.toISOString().split("T")[0];
+  try {
+    // 📅 Fecha de mañana
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    const fecha = manana.toISOString().split("T")[0];
 
-  const { data } = await supabase
-    .from("citas")
-    .select("*")
-    .eq("fecha", fecha);
+    // 🔎 Obtener citas de mañana
+    const { data, error } = await supabase
+      .from("citas")
+      .select("*")
+      .eq("fecha", fecha);
 
-  data.forEach(cita => {
-    const mensaje = `Hola ${cita.nombre}, te recordamos tu cita mañana a las ${cita.hora} 💈`;
+    if (error) {
+      console.error("Error Supabase:", error);
+      return res.status(500).json({ ok: false, error });
+    }
 
-    const telefono = cita.telefono.replace(/\D/g, "");
+    if (!data || data.length === 0) {
+      console.log("No hay citas para mañana");
+      return res.status(200).json({ ok: true, message: "Sin citas" });
+    }
 
-    fetch(`https://api.callmebot.com/whatsapp.php?phone=52${telefono}&text=${encodeURIComponent(mensaje)}&apikey=TU_API_KEY`);
-  });
+    // 🔁 Enviar recordatorios
+    for (const cita of data) {
+      const mensaje = `Hola ${cita.nombre}, te recordamos tu cita mañana a las ${cita.hora} 💈`;
 
-  res.status(200).json({ ok: true });
+      const telefono = (cita.telefono || "").replace(/\D/g, "");
+
+      if (!telefono) continue;
+
+      try {
+        await fetch(
+          `https://api.callmebot.com/whatsapp.php?phone=52${telefono}&text=${encodeURIComponent(mensaje)}&apikey=sb_publishable_VT8zMemcFqijDaeU1mANDw_SiqasjjE`
+        );
+
+        console.log(`✅ Enviado a ${telefono}`);
+      } catch (err) {
+        console.error("Error enviando mensaje:", err);
+      }
+    }
+
+    return res.status(200).json({ ok: true });
+
+  } catch (err) {
+    console.error("Error general:", err);
+    return res.status(500).json({ ok: false });
+  }
 }
